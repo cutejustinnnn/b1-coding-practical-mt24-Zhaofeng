@@ -3,6 +3,8 @@ from dataclasses import dataclass
 import numpy as np
 import matplotlib.pyplot as plt
 from .terrain import generate_reference_and_limits
+import pandas as pd
+import csv
 
 class Submarine:
     def __init__(self):
@@ -68,6 +70,7 @@ class Mission:
     cave_height: np.ndarray
     cave_depth: np.ndarray
 
+
     @classmethod
     def random_mission(cls, duration: int, scale: float):
         (reference, cave_height, cave_depth) = generate_reference_and_limits(duration, scale)
@@ -75,8 +78,32 @@ class Mission:
 
     @classmethod
     def from_csv(cls, file_name: str):
-        # You are required to implement this method
-        pass
+            # You are required to implement this method
+            
+            # Lists to store the data
+            reference = []
+            cave_height = []
+            cave_depth = []
+
+            # Read the CSV file
+            with open(file_name, 'r') as csvfile:
+                reader = csv.reader(csvfile)
+                next(reader)  # Skip the header
+
+                # Iterate over each row and append the data
+                for row in reader:
+                    reference.append(float(row[0]))
+                    cave_height.append(float(row[1]))
+                    cave_depth.append(float(row[2]))
+
+            # Convert lists to numpy arrays
+            reference = np.array(reference)
+            cave_height = np.array(cave_height)
+            cave_depth = np.array(cave_depth)
+
+            # Return a new instance of Mission
+            return cls(reference, cave_height, cave_depth)
+            
 
 
 class ClosedLoop:
@@ -95,13 +122,29 @@ class ClosedLoop:
         self.plant.reset_state()
 
         for t in range(T):
+            #get current position and depth 
             positions[t] = self.plant.get_position()
-            observation_t = self.plant.get_depth()
+            observation_t = self.plant.get_depth()  #current depth y[t]
+
             # Call your controller here
+            # Get the reference depth r[t] for the current time step
+            reference_t = mission.reference[t]
+
+            # Compute the control action u[t] using the PD controller
+            actions[t] = self.controller.compute_control_action(reference_t, observation_t)
+
+            # Store the control action
+            #actions[t] = control_action
+
+            # Apply the control action and disturbance to the plant (submarine)
+            #self.plant.transition(control_action, disturbances[t])
+ 
             self.plant.transition(actions[t], disturbances[t])
 
         return Trajectory(positions)
         
     def simulate_with_random_disturbances(self, mission: Mission, variance: float = 0.5) -> Trajectory:
+        #print('var:',variance)
+        #print('reference_depth:',mission.reference)
         disturbances = np.random.normal(0, variance, len(mission.reference))
         return self.simulate(mission, disturbances)
